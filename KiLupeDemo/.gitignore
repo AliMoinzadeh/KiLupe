@@ -1,0 +1,20 @@
+artifacts/
+models/
+local-models/
+tools/fixtures/
+__pycache__/
+tessdata/*.traineddata
+dictionaries/*.aff
+dictionaries/*.dic
+
+# .NET build output
+bin/
+obj/
+.vs/
+.superpowers/
+*.user
+*.suo
+
+# Local evaluation output
+*.log
+test-output.txt

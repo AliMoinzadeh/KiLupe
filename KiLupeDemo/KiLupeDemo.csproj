@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="tests\**" />
+    <EmbeddedResource Remove="tests\**" />
+    <None Remove="tests\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ONNX Runtime mit DirectML-Unterstützung für Windows GPU/NPU -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.19.2" />
+    <PackageReference Include="Microsoft.ML.Tokenizers" Version="3.0.0-preview.26457.2" />
+    <PackageReference Include="LLamaSharp" Version="0.27.0" />
+    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.27.0" />
+    <!-- OpenCV Wrapper für Bildverarbeitung in .NET -->
+    <PackageReference Include="OpenCvSharp4" Version="4.10.0.20241108" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.10.0.20241108" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
+    <PackageReference Include="WeCantSpell.Hunspell" Version="7.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="artifacts\models\**\*.download" />
+    <None Update="tessdata\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="dictionaries\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="yolov8n.onnx" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="artifacts\models\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Remove="artifacts\models\qwen2.5-3b-instruct\*.gguf" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,17 @@
+<Window x:Class="KiLupeDemo.Services.DetectionOverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Ki-Lupe Treffer-Markierungen"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        IsHitTestVisible="False"
+        UseLayoutRounding="True">
+  <Canvas x:Name="MarkerCanvas"
+          Background="Transparent"
+          IsHitTestVisible="False" />
+</Window>

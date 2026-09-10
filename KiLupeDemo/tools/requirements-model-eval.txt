@@ -1,0 +1,6 @@
+numpy
+onnxruntime
+Pillow
+torch
+transformers
+sentencepiece
