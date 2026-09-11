@@ -71,7 +71,9 @@ public partial class MainWindow : Window
         InitializeComponent();
         SetWorkspaceContentMode(WorkspaceContentMode.None);
         ResultsList.ItemsSource = results;
-        analysisConfiguration = AnalysisConfiguration.Default;
+        var startupConfiguration = StartupConfigurationLoader.Load(
+            Path.Combine(AppContext.BaseDirectory, StartupConfigurationLoader.FileName));
+        analysisConfiguration = startupConfiguration.Configuration;
         modelCatalog = ModelCatalog.Create();
         analysisCoordinator = new AnalysisCoordinator(
             AnalysisServiceFactory.CreateServices(analysisConfiguration));
@@ -80,6 +82,11 @@ public partial class MainWindow : Window
         correctionCoordinator = CreateCorrectionCoordinator(textCorrectionService);
         InitializeModelSelectors();
         UpdateModelStatus();
+        if (startupConfiguration.Warning is not null)
+        {
+            StatusText.Text = startupConfiguration.Warning;
+            StatusText.ToolTip = startupConfiguration.Warning;
+        }
 
         try
         {

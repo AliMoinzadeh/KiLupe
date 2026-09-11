@@ -82,3 +82,25 @@ dotnet test tests/KiLupeDemo.Tests/KiLupeDemo.Tests.csproj --no-restore
 ```
 
 Die Tests pruefen Ergebnisaggregation, Abbruch veralteter Analysen, fehlende Modelldaten, OCR-Status und die Begrenzung von Bildschirmaufnahmebereichen.
+
+## Modellauswahl beim Programmstart
+
+Die Datei `kilupe.config.json` legt die Startauswahl fest:
+
+```json
+{
+  "objectModel": "YoloV8N",
+  "textCorrectionModel": "None",
+  "provider": "Auto"
+}
+```
+
+| Einstellung | Erlaubte Werte |
+| --- | --- |
+| `objectModel` | `YoloV8N`, `RtDetr` |
+| `textCorrectionModel` | `None` (aus), `GermanSpelling`, `LocalLlm` (Qwen 3B) |
+| `provider` | `Auto`, `DirectMl`, `Cpu` |
+
+Beim Entwickeln die Datei im Projektordner bearbeiten; der Build kopiert sie neben die EXE. Bei einer verteilten App die Datei neben `KiLupeDemo.exe` bearbeiten. Die App liest die Datei bei jedem Start aus ihrem Programmverzeichnis, unabhaengig vom Arbeitsverzeichnis.
+
+Fehlende Felder oder eine fehlende Datei verwenden die bisherigen Standardwerte. Bei ungueltigem JSON, unbekannten Einstellungen oder ungueltigen Werten verwendet die App die Standardwerte und zeigt einen Hinweis im Statusbereich. Modellnamen waehlen vorhandene Modelle aus; fehlende Modelldateien werden weiterhin in der Modellauswahl gemeldet. Aenderungen an den Dropdowns gelten fuer die laufende Sitzung und werden nicht in die Datei zurueckgeschrieben.

@@ -1,0 +1,5 @@
+{
+  "objectModel": "RtDetr",
+  "textCorrectionModel": "GermanSpelling",
+  "provider": "Auto"
+}
