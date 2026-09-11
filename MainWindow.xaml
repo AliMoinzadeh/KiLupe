@@ -55,6 +55,7 @@
                   Click="OpenImage_Click" />
           <Button Content="Textdatei laden"
             Click="OpenTextFile_Click" />
+          <Button Content="Text speichern unter" Click="SaveTextFile_Click" />
           <Button Content="Objekte suchen"
                   Click="AnalyzeObjects_Click" />
           <Button Content="Text pruefen"
@@ -105,13 +106,16 @@
                        Foreground="#9AA9A4"
                        FontSize="16" />
                 <TextBox x:Name="WorkspaceTextDocument"
+                   TextChanged="WorkspaceTextDocument_TextChanged"
+                   IsInactiveSelectionHighlightEnabled="True"
+                   SelectionBrush="Yellow"
                    Padding="16"
                    Background="#101814"
                    BorderThickness="0"
                    Foreground="#EEF3EF"
                    FontSize="14"
                    HorizontalScrollBarVisibility="Disabled"
-                   IsReadOnly="True"
+                   IsReadOnly="False"
                    AcceptsReturn="True"
                    TextWrapping="Wrap"
                    VerticalContentAlignment="Top"
@@ -284,7 +288,7 @@
                        FontSize="11"
                        TextWrapping="Wrap" />
           </StackPanel>
-          <ListBox x:Name="ResultsList"
+          <ListBox x:Name="ResultsList" SelectionChanged="ResultsList_SelectionChanged"
                    Background="Transparent"
                    BorderThickness="0"
                    Foreground="#EEF3EF"

@@ -24,6 +24,10 @@ public partial class DetectionOverlayWindow : Window
     private DispatcherTimer? fadeTimer;
     private CaptureRegion virtualScreenRegion;
     private int renderVersion;
+    private readonly List<DetectionMarker> textMarkers = new();
+    private DispatcherTimer? hoverTimer;
+    private DetectionMarker? hoveredMarker;
+    private Border? hoverLabel;
 
     public DetectionOverlayWindow()
     {
@@ -91,7 +95,11 @@ public partial class DetectionOverlayWindow : Window
             var element = CreateMarkerElement(marker);
             PositionElement(element, marker.ScreenBounds);
             MarkerCanvas.Children.Add(element);
-            if (marker.Shape == DetectionMarkerShape.Circle)
+            if (marker.Shape == DetectionMarkerShape.Spelling)
+            {
+                textMarkers.Add(marker);
+            }
+            else if (marker.Shape == DetectionMarkerShape.Circle)
             {
                 var label = CreateObjectLabel(marker);
                 PositionObjectLabel(label, marker.ScreenBounds);
@@ -106,11 +114,26 @@ public partial class DetectionOverlayWindow : Window
 
         MarkerCanvas.BeginAnimation(UIElement.OpacityProperty, null);
         MarkerCanvas.Opacity = 1;
-        ScheduleFade(currentVersion, visibleDuration);
+        if (textMarkers.Count > 0)
+        {
+            hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            hoverTimer.Tick += (_, _) => PollPointer();
+            hoverTimer.Start();
+            PollPointer();
+        }
+        else
+        {
+            ScheduleFade(currentVersion, visibleDuration);
+        }
     }
 
     public void ClearResults()
     {
+        hoverTimer?.Stop();
+        hoverTimer = null;
+        textMarkers.Clear();
+        hoveredMarker = null;
+        hoverLabel = null;
         renderVersion++;
         StopFadeTimer();
         MarkerCanvas.BeginAnimation(UIElement.OpacityProperty, null);
@@ -193,6 +216,53 @@ public partial class DetectionOverlayWindow : Window
         };
     }
 
+    private void PollPointer()
+    {
+        if (IsVisible && GetCursorPos(out var pointer))
+        {
+            UpdateHoveredMarker(new Point(pointer.X, pointer.Y));
+        }
+    }
+
+    private void UpdateHoveredMarker(Point screenPoint)
+    {
+        var marker = textMarkers
+            .Where(item => item.ScreenBounds.Contains(screenPoint))
+            .OrderBy(item => item.ScreenBounds.Width * item.ScreenBounds.Height)
+            .FirstOrDefault();
+        if (marker == hoveredMarker) return;
+        if (hoverLabel is not null) MarkerCanvas.Children.Remove(hoverLabel);
+        hoveredMarker = marker;
+        hoverLabel = null;
+        if (marker is null) return;
+
+        hoverLabel = CreateObjectLabel(marker);
+        var text = (TextBlock)hoverLabel.Child;
+        text.TextWrapping = TextWrapping.Wrap;
+        text.TextTrimming = TextTrimming.None;
+        hoverLabel.Measure(new Size(260, double.PositiveInfinity));
+        var left = (marker.ScreenBounds.Left - virtualScreenRegion.Left) * Width / virtualScreenRegion.Width;
+        var top = (marker.ScreenBounds.Bottom - virtualScreenRegion.Top) * Height / virtualScreenRegion.Height + 4;
+        if (top + hoverLabel.DesiredSize.Height > Height)
+        {
+            top = (marker.ScreenBounds.Top - virtualScreenRegion.Top) * Height / virtualScreenRegion.Height - hoverLabel.DesiredSize.Height - 4;
+        }
+        Canvas.SetLeft(hoverLabel, Math.Clamp(left, 0, Math.Max(0, Width - hoverLabel.DesiredSize.Width)));
+        Canvas.SetTop(hoverLabel, Math.Max(0, top));
+        MarkerCanvas.Children.Add(hoverLabel);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out NativePoint point);
+
     private static Border CreateTextMarker(DetectionMarker marker, Brush brush)
     {
         return new Border
@@ -213,17 +283,10 @@ public partial class DetectionOverlayWindow : Window
     {
         return new Border
         {
-            MinWidth = 42,
-            MinHeight = 24,
-            BorderBrush = brush,
-            BorderThickness = new Thickness(0, 0, 0, 3),
-            Background = new SolidColorBrush(Color.FromArgb(28, marker.Color.R, marker.Color.G, marker.Color.B)),
-            Padding = new Thickness(4, 2, 4, 2),
-            Child = CreateLabel(marker.Label, brush),
+            Background = new SolidColorBrush(Color.FromArgb(100, 255, 255, 0)),
             IsHitTestVisible = false
         };
     }
-
     private static TextBlock CreateLabel(string label, Brush brush)
     {
         return new TextBlock
@@ -256,8 +319,8 @@ public partial class DetectionOverlayWindow : Window
 
         Canvas.SetLeft(element, localLeft * scaleX);
         Canvas.SetTop(element, localTop * scaleY);
-        element.SetValue(FrameworkElement.WidthProperty, Math.Max(42, screenBounds.Width * scaleX));
-        element.SetValue(FrameworkElement.HeightProperty, Math.Max(24, screenBounds.Height * scaleY));
+        element.SetValue(FrameworkElement.WidthProperty, Math.Max(1, screenBounds.Width * scaleX));
+        element.SetValue(FrameworkElement.HeightProperty, Math.Max(1, screenBounds.Height * scaleY));
     }
 
     private void PositionObjectLabel(FrameworkElement label, Rect screenBounds)

@@ -244,6 +244,56 @@ public partial class MainWindow : Window
         }
     }
 
+    private void SaveTextFile_Click(object sender, RoutedEventArgs e)
+    {
+        if (workspaceContentMode != WorkspaceContentMode.Text || currentTextDocument is null)
+        {
+            StatusText.Text = "Bitte zuerst eine Textdatei laden.";
+            return;
+        }
+        var dialog = new SaveFileDialog
+        {
+            FileName = Path.GetFileName(currentTextDocument.FilePath),
+            Filter = "Textdateien|*.txt;*.md;*.log;*.csv;*.json;*.xml|Alle Dateien|*.*",
+            DefaultExt = Path.GetExtension(currentTextDocument.FilePath)
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            File.WriteAllText(dialog.FileName, WorkspaceTextDocument.Text, new System.Text.UTF8Encoding(false));
+            StatusText.Text = $"Text gespeichert: {Path.GetFileName(dialog.FileName)}";
+        }
+        catch (Exception exception)
+        {
+            StatusText.Text = $"Text konnte nicht gespeichert werden: {exception.Message}";
+        }
+    }
+
+    private void WorkspaceTextDocument_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (currentTextDocument is null || currentTextDocument.Text == WorkspaceTextDocument.Text) return;
+        var text = WorkspaceTextDocument.Text;
+        currentTextDocument = currentTextDocument with
+        {
+            Text = text,
+            Lines = text.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None)
+        };
+        ClearResults();
+        StatusText.Text = "Text bearbeitet. Zum Aktualisieren erneut Text pruefen.";
+    }
+
+    private void ResultsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        RenderResultOverlays();
+        if (workspaceContentMode != WorkspaceContentMode.Text || ResultsList.SelectedItem is not AnalysisResult result) return;
+        if (result.Bounds.IsEmpty) return;
+        var start = (int)result.Bounds.X;
+        var length = (int)result.Bounds.Width;
+        if (start < 0 || start + length > WorkspaceTextDocument.Text.Length) return;
+        WorkspaceTextDocument.Select(start, length);
+        WorkspaceTextDocument.ScrollToLine(WorkspaceTextDocument.GetLineIndexFromCharacterIndex(start));
+    }
+
     private void OpenTextFile_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
@@ -554,17 +604,9 @@ public partial class MainWindow : Window
                     WorkspaceImage.Source = frame.Image;
                     SetWorkspaceContentMode(WorkspaceContentMode.Image);
                     ApplySnapshot(snapshot);
-                    if (UsesTextAnalysis(mode))
-                    {
-                        await ApplyCorrectionsAsync(snapshot, operationCancellation.Token);
-                    }
-                    else
-                    {
-                        correctionPresentationState.Clear(snapshot.RequestId);
-                        UpdateCorrectionSurface();
-                    }
+
                     var detectedResults = snapshot.Results
-                        .Where(result => result.Kind != AnalysisKind.Status)
+                        .Where(result => UsesTextAnalysis(mode) ? result.Kind == AnalysisKind.Spelling : result.Kind == AnalysisKind.Object)
                         .ToArray();
                     if (detectedResults.Length == 0)
                     {
@@ -583,6 +625,15 @@ public partial class MainWindow : Window
                         ? snapshot.StatusText
                         : $"{detectedResults.Length} Treffer: {string.Join(", ", detectedResults.Take(2).Select(result => result.Label))}";
                     overlayWindow?.SetStatus(floatingStatus);
+                    if (UsesTextAnalysis(mode))
+                    {
+                        await ApplyCorrectionsAsync(snapshot, operationCancellation.Token);
+                    }
+                    else
+                    {
+                        correctionPresentationState.Clear(snapshot.RequestId);
+                        UpdateCorrectionSurface();
+                    }
                 }
                 catch (OperationCanceledException) when (operationCancellation.IsCancellationRequested)
                 {
@@ -709,6 +760,20 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (workspaceContentMode == WorkspaceContentMode.Text && currentTextDocument is not null)
+            {
+                results.Clear();
+                var searchStart = 0;
+                foreach (var suggestion in suggestions)
+                {
+                    var start = currentTextDocument.Text.IndexOf(suggestion.OriginalText, searchStart, StringComparison.Ordinal);
+                    if (start < 0 || suggestion.OriginalText.Length == 0) continue;
+                    searchStart = start + suggestion.OriginalText.Length;
+                    results.Add(new AnalysisResult(AnalysisKind.Spelling, suggestion.OriginalText, 1,
+                        new Rect(start, 0, suggestion.OriginalText.Length, 1), suggestion.CorrectedText));
+                }
+                ResultCountText.Text = $"{results.Count} Treffer";
+            }
             correctionPresentationState.Apply(requestId, suggestions);
             UpdateCorrectionSurface();
         }
@@ -763,7 +828,7 @@ public partial class MainWindow : Window
         if (floatingMode && overlayWindow is not null && correctionOverlayWindow is not null)
         {
             correctionOverlayWindow.SetState(correctionPresentationState);
-            correctionOverlayWindow.ShowNear(overlayWindow);
+            if (correctionOverlayWindow.IsVisible) correctionOverlayWindow.ShowNear(overlayWindow);
         }
         else
         {
@@ -1021,13 +1086,14 @@ public partial class MainWindow : Window
             var top = imageRect.Top + result.Bounds.Top * imageRect.Height / currentImage.PixelHeight;
             var width = Math.Max(42, result.Bounds.Width * imageRect.Width / currentImage.PixelWidth);
             var height = Math.Max(26, result.Bounds.Height * imageRect.Height / currentImage.PixelHeight);
-            var accent = result.Kind == AnalysisKind.Spelling ? Colors.OrangeRed : Colors.LightGreen;
+            var selected = ReferenceEquals(ResultsList.SelectedItem, result);
+            var accent = selected ? Colors.Yellow : result.Kind == AnalysisKind.Spelling ? Colors.OrangeRed : Colors.LightGreen;
             var border = new Border
             {
                 Width = width,
                 Height = height,
                 BorderBrush = new SolidColorBrush(accent),
-                BorderThickness = new Thickness(2),
+                BorderThickness = new Thickness(selected ? 4 : 2),
                 Background = new SolidColorBrush(Color.FromArgb(42, accent.R, accent.G, accent.B)),
                 CornerRadius = new CornerRadius(4),
                 Child = new TextBlock

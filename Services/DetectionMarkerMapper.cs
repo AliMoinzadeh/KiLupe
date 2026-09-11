@@ -35,7 +35,7 @@ public static class DetectionMarkerMapper
         {
             return new DetectionMarker(
                 result.Kind,
-                result.Label,
+                result.Kind == AnalysisKind.Spelling ? result.Details : result.Label,
                 result.Confidence,
                 Rect.Empty,
                 style.Shape,
@@ -49,7 +49,7 @@ public static class DetectionMarkerMapper
         {
             return new DetectionMarker(
                 result.Kind,
-                result.Label,
+                result.Kind == AnalysisKind.Spelling ? result.Details : result.Label,
                 result.Confidence,
                 Rect.Empty,
                 style.Shape,
@@ -67,7 +67,7 @@ public static class DetectionMarkerMapper
 
         return new DetectionMarker(
             result.Kind,
-            result.Label,
+            result.Kind == AnalysisKind.Spelling ? result.Details : result.Label,
             result.Confidence,
             screenBounds,
             style.Shape,
@@ -80,7 +80,7 @@ public static class DetectionMarkerMapper
         {
             AnalysisKind.Object => (DetectionMarkerShape.Circle, Color.FromRgb(0x9A, 0xE6, 0xB4)),
             AnalysisKind.Text => (DetectionMarkerShape.Rectangle, Color.FromRgb(0x67, 0xD7, 0xE8)),
-            AnalysisKind.Spelling => (DetectionMarkerShape.Spelling, Color.FromRgb(0xFF, 0x6B, 0x5E)),
+            AnalysisKind.Spelling => (DetectionMarkerShape.Spelling, Colors.Yellow),
             _ => (DetectionMarkerShape.Rectangle, Colors.Transparent)
         };
     }

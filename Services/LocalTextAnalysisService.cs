@@ -154,7 +154,9 @@ public sealed class LocalTextAnalysisService : IAnalysisService, IDisposable
                     word,
                     1,
                     imageBounds,
-                    "Wort nicht im deutschen oder englischen Woerterbuch gefunden."));
+                    string.Join(" / ", (germanDictionary?.Suggest(word) ?? Enumerable.Empty<string>())
+                        .Concat(englishDictionary?.Suggest(word) ?? Enumerable.Empty<string>())
+                        .Distinct().Take(3).DefaultIfEmpty("Kein Vorschlag verfuegbar"))));
             }
         }
         while (iterator.Next(PageIteratorLevel.Word));
