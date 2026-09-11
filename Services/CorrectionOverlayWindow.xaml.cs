@@ -25,10 +25,7 @@ public partial class CorrectionOverlayWindow : Window
         StatusText.Text = state.StatusText;
         CopyButton.IsEnabled = SuggestionTextBox.Text.Length > 0;
         CopySelectionButton.IsEnabled = SuggestionTextBox.Text.Length > 0;
-        if (!IsVisible)
-        {
-            Show();
-        }
+
     }
 
     public void ShowNear(Window anchor)

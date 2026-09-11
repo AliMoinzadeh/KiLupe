@@ -435,6 +435,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        ClearCorrections();
         floatingMode = true;
         floatingPaused = false;
         floatingAnalysisMode = FloatingAnalysisMode.ObjectsCursor;
@@ -448,7 +449,7 @@ public partial class MainWindow : Window
         overlayWindow.CorrectionRequested += OverlayWindow_CorrectionRequested;
         overlayWindow.ExitRequested += OverlayWindow_ExitRequested;
         correctionOverlayWindow = new CorrectionOverlayWindow();
-        overlayWindow.SetCorrectionAvailable(false);
+        overlayWindow.SetCorrectionAvailable(textCorrectionService?.IsAvailable == true);
         overlayWindow.SetPaused(false);
         overlayWindow.SetMode(GetFloatingModeLabel());
         overlayWindow.SetStatus("Starte Analyse...");
@@ -467,8 +468,6 @@ public partial class MainWindow : Window
 
         overlayWindow.ShowAtTaskbar();
 
-        WindowState = WindowState.Minimized;
-        Hide();
         StatusText.Text = "Schwebemodus aktiv.";
 
         _ = RunFloatingAnalysisLoopAsync(floatingCancellation);
@@ -508,7 +507,6 @@ public partial class MainWindow : Window
 
         if (restoreWindow && !closing)
         {
-            WindowState = WindowState.Normal;
             if (!IsVisible)
             {
                 Show();
@@ -547,20 +545,62 @@ public partial class MainWindow : Window
         ClearCorrections();
     }
 
-    private void OverlayWindow_CorrectionRequested(object? sender, EventArgs e)
+    private bool selectionCorrectionRunning;
+
+    private async void OverlayWindow_CorrectionRequested(object? sender, EventArgs e)
     {
-        if (!correctionPresentationState.IsVisible || overlayWindow is null)
+        if (selectionCorrectionRunning || !floatingMode || floatingCancellation is null) return;
+        ClearCorrections();
+        selectionCorrectionRunning = true;
+        var generation = correctionGeneration;
+        var token = floatingCancellation.Token;
+        try
         {
-            overlayWindow?.SetStatus("Noch kein Korrekturvorschlag vorhanden.");
-            return;
+            overlayWindow?.SetStatus("Lese ausgewaehlten Text...");
+            var selection = await Task.Run(() => new SelectedTextReader().ReadSelection(), token)
+                .WaitAsync(TimeSpan.FromSeconds(3), token);
+            if (generation != correctionGeneration || !floatingMode || token.IsCancellationRequested) return;
+            var selectedText = selection.Text ?? string.Empty;
+            if (!selection.Success)
+            {
+                var dialog = new SelectedTextDialog(selection.Message);
+                using var closeOnCancel = token.Register(() => Dispatcher.BeginInvoke(new Action(dialog.Close)));
+                if (dialog.ShowDialog() != true) return;
+                selectedText = dialog.SelectedText;
+            }
+            if (generation != correctionGeneration || !floatingMode || token.IsCancellationRequested) return;
+            correctionOverlayWindow?.Hide();
+            overlayWindow?.SetStatus("Pruefe ausgewaehlten Text...");
+            await ApplyCorrectionsAsync(generation,
+                (coordinator, cancellationToken) => coordinator.CreateSuggestionsAsync(new[] { selectedText }, cancellationToken), token);
+            if (generation != correctionGeneration || !floatingMode || token.IsCancellationRequested) return;
+            if (correctionPresentationState.IsVisible && overlayWindow is not null)
+            {
+                correctionOverlayWindow?.ShowNear(overlayWindow);
+                overlayWindow.SetStatus("Korrektur fuer die Textauswahl bereit.");
+            }
+            else
+            {
+                overlayWindow?.SetStatus("Keine Korrektur fuer die Auswahl gefunden.");
+            }
         }
-
-        UpdateCorrectionSurface();
-        correctionOverlayWindow?.ShowNear(overlayWindow);
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (TimeoutException)
+        {
+            overlayWindow?.SetStatus("Das Programm antwortet nicht auf die Abfrage der Textauswahl.");
+        }
+        catch (Exception exception)
+        {
+            overlayWindow?.SetStatus(exception.Message);
+        }
+        finally
+        {
+            selectionCorrectionRunning = false;
+        }
     }
-
     private void OverlayWindow_ResultsRequested(object? sender, EventArgs e)
     {
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         StopFloatingMode();
     }
 
@@ -624,16 +664,8 @@ public partial class MainWindow : Window
                     var floatingStatus = detectedResults.Length == 0
                         ? snapshot.StatusText
                         : $"{detectedResults.Length} Treffer: {string.Join(", ", detectedResults.Take(2).Select(result => result.Label))}";
-                    overlayWindow?.SetStatus(floatingStatus);
-                    if (UsesTextAnalysis(mode))
-                    {
-                        await ApplyCorrectionsAsync(snapshot, operationCancellation.Token);
-                    }
-                    else
-                    {
-                        correctionPresentationState.Clear(snapshot.RequestId);
-                        UpdateCorrectionSurface();
-                    }
+                    if (!selectionCorrectionRunning) overlayWindow?.SetStatus(floatingStatus);
+
                 }
                 catch (OperationCanceledException) when (operationCancellation.IsCancellationRequested)
                 {
@@ -801,7 +833,7 @@ public partial class MainWindow : Window
 
     private void UpdateCorrectionSurface()
     {
-        overlayWindow?.SetCorrectionAvailable(correctionPresentationState.IsVisible);
+        overlayWindow?.SetCorrectionAvailable(textCorrectionService?.IsAvailable == true);
         if (!correctionPresentationState.IsVisible)
         {
             HideCorrectionPane();

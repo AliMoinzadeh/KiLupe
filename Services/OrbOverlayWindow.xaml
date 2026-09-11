@@ -69,9 +69,11 @@
           Click="ClearButton_Click" />
         <Button x:Name="CorrectionButton"
           Style="{StaticResource OrbButtonStyle}"
-          Content="K"
+          Content="Auswahl"
+          Width="72"
+          Focusable="False"
           IsEnabled="False"
-          ToolTip="Korrekturvorschlag anzeigen"
+          ToolTip="Ausgewaehlten Text pruefen"
           Click="CorrectionButton_Click" />
         <Button x:Name="ModeButton"
                 Style="{StaticResource OrbButtonStyle}"

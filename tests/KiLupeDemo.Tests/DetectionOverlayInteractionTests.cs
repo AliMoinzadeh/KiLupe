@@ -104,6 +104,51 @@ public sealed class DetectionOverlayInteractionTests
             finally { window.Close(); }
         });
     }
+    [Fact]
+    public void UpdatingCorrectionContentDoesNotOpenPopup()
+    {
+        OnUiThread(() =>
+        {
+            var window = new CorrectionOverlayWindow { Left = -32000, Top = -32000 };
+            try
+            {
+                window.SetState(CorrectionPresentationState.From(new[]
+                {
+                    new CorrectionSuggestion("Mein Text", "Mein korrigierter Text", "test", "CPU")
+                }));
+                Assert.False(window.IsVisible);
+                Assert.Equal("Mein korrigierter Text", ((TextBox)window.FindName("SuggestionTextBox")).Text);
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Fact]
+    public void ManualSelectionRequiresExplicitValidText()
+    {
+        OnUiThread(() =>
+        {
+            var window = new SelectedTextDialog("Keine automatische Auswahl.");
+            try
+            {
+                var layout = (DockPanel)window.Content;
+                var input = Assert.Single(layout.Children.OfType<TextBox>());
+                var actions = Assert.Single(layout.Children.OfType<StackPanel>());
+                var submit = actions.Children.OfType<Button>().Single(button => !button.IsCancel);
+                Assert.Equal(string.Empty, window.SelectedText);
+                Assert.False(submit.IsEnabled);
+                input.Text = "Mein Absatz.\r\nMit Zusammenhang.";
+                Assert.True(submit.IsEnabled);
+                Assert.Equal("Mein Absatz.\r\nMit Zusammenhang.", window.SelectedText);
+                input.Text = new string('x', 20001);
+                Assert.False(submit.IsEnabled);
+                input.Text = " ";
+                Assert.False(submit.IsEnabled);
+            }
+            finally { window.Close(); }
+        });
+    }
+
     private static void UpdatePointer(DetectionOverlayWindow window, Point point)
     {
         var method = typeof(DetectionOverlayWindow).GetMethod("UpdateHoveredMarker", BindingFlags.NonPublic | BindingFlags.Instance);

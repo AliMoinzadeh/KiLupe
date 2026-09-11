@@ -96,6 +96,17 @@ public sealed class CorrectionCoordinatorTests
         Assert.Empty(service.Calls);
     }
 
+    [Fact]
+    public async Task SelectedParagraphKeepsItsContextAcrossLineBreaks()
+    {
+        const string selection = "Das ist mein Text.\r\nEr hat ein Fehler.";
+        var service = new FakeCorrectionService("Das ist mein Text.\r\nEr hat einen Fehler.");
+        var suggestions = await new CorrectionCoordinator(service).CreateSuggestionsAsync(
+            new[] { selection }, CancellationToken.None);
+        Assert.Equal(selection, Assert.Single(suggestions).OriginalText);
+        Assert.Equal(new[] { selection }, service.Calls);
+    }
+
     private sealed class FakeCorrectionService : ITextCorrectionService
     {
         private readonly string correctedText;

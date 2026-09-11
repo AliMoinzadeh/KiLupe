@@ -64,8 +64,8 @@ public partial class OrbOverlayWindow : Window
     {
         CorrectionButton.IsEnabled = available;
         CorrectionButton.ToolTip = available
-            ? "Korrekturvorschlag anzeigen"
-            : "Noch kein Korrekturvorschlag vorhanden";
+            ? "Auswahl pruefen: zuerst einen zusammenhaengenden Text im Programm markieren"
+            : "Textkorrekturmodell ist nicht verfuegbar";
     }
 
     protected override void OnSourceInitialized(EventArgs e)

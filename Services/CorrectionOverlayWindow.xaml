@@ -37,6 +37,8 @@
                    VerticalAlignment="Center" />
       </DockPanel>
       <TextBlock x:Name="OriginalText"
+                 MaxHeight="48"
+                 TextTrimming="CharacterEllipsis"
                  Grid.Row="1"
                  Margin="0,8,0,6"
                  Foreground="#C4D0CB"
