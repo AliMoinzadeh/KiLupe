@@ -149,6 +149,50 @@ public sealed class DetectionOverlayInteractionTests
         });
     }
 
+    [Fact]
+    public void PresentationModeIncludesOverlayExceptDuringOwnCapture()
+    {
+        OnUiThread(() =>
+        {
+            var window = new DetectionOverlayWindow { Width = 100, Height = 100 };
+            try
+            {
+                var handle = new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
+                AssertAffinity(handle, 0x11);
+                window.SetPresentationMode(true);
+                AssertAffinity(handle, 0);
+                var result = window.CaptureWithoutMarkersAsync(() =>
+                {
+                    AssertAffinity(handle, 0x11);
+                    return Task.FromResult(123);
+                }).GetAwaiter().GetResult();
+                Assert.Equal(123, result);
+                AssertAffinity(handle, 0);
+                Assert.Throws<OperationCanceledException>(() => window.CaptureWithoutMarkersAsync<int>(() =>
+                    Task.FromException<int>(new OperationCanceledException())).GetAwaiter().GetResult());
+                AssertAffinity(handle, 0);
+                window.CaptureWithoutMarkersAsync(() =>
+                {
+                    window.SetPresentationMode(false);
+                    AssertAffinity(handle, 0x11);
+                    return Task.FromResult(0);
+                }).GetAwaiter().GetResult();
+                AssertAffinity(handle, 0x11);
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    private static void AssertAffinity(IntPtr handle, uint expected)
+    {
+        Assert.True(GetWindowDisplayAffinity(handle, out var actual));
+        Assert.Equal(expected, actual);
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool GetWindowDisplayAffinity(IntPtr window, out uint affinity);
+
     private static void UpdatePointer(DetectionOverlayWindow window, Point point)
     {
         var method = typeof(DetectionOverlayWindow).GetMethod("UpdateHoveredMarker", BindingFlags.NonPublic | BindingFlags.Instance);

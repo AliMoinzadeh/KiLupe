@@ -464,6 +464,7 @@ public partial class MainWindow : Window
         try
         {
             detectionOverlayWindow = new DetectionOverlayWindow();
+            detectionOverlayWindow.SetPresentationMode(PresentationModeCheckBox.IsChecked == true);
             detectionOverlayWindow.ShowOnVirtualScreen();
         }
         catch (Exception exception)
@@ -707,17 +708,39 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task<ScreenCaptureFrame> CaptureFloatingImageAsync(
+    private void PresentationMode_Changed(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            detectionOverlayWindow?.SetPresentationMode(PresentationModeCheckBox.IsChecked == true);
+            StatusText.Text = PresentationModeCheckBox.IsChecked == true
+                ? "Video-Call aktiv: Den ganzen Bildschirm teilen."
+                : "Markierungen werden aus Bildschirmaufnahmen ausgeschlossen.";
+        }
+        catch (Win32Exception exception)
+        {
+            PresentationModeCheckBox.IsChecked = false;
+            StatusText.Text = exception.Message;
+        }
+        catch (System.Runtime.InteropServices.COMException exception)
+        {
+            StatusText.Text = exception.Message;
+        }
+    }
+
+    private Task<ScreenCaptureFrame> CaptureFloatingImageAsync(
         FloatingAnalysisMode mode,
         CancellationToken cancellationToken)
     {
-        return await Task.Run(
+        Task<ScreenCaptureFrame> Capture() => Task.Run(
             () => IsFullScreenMode(mode)
                 ? screenCaptureService.CaptureVirtualScreenFrame()
                 : screenCaptureService.CaptureCursorFrame(),
             cancellationToken);
+        return detectionOverlayWindow is { } markers
+            ? markers.CaptureWithoutMarkersAsync(Capture)
+            : Capture();
     }
-
     private string GetFloatingModeLabel()
     {
         return floatingAnalysisMode switch

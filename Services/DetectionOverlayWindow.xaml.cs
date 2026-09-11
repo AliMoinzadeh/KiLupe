@@ -24,6 +24,9 @@ public partial class DetectionOverlayWindow : Window
     private DispatcherTimer? fadeTimer;
     private CaptureRegion virtualScreenRegion;
     private int renderVersion;
+    private bool presentationMode;
+    private int ownCaptureDepth;
+    private uint? appliedAffinity;
     private readonly List<DetectionMarker> textMarkers = new();
     private DispatcherTimer? hoverTimer;
     private DetectionMarker? hoveredMarker;
@@ -55,6 +58,47 @@ public partial class DetectionOverlayWindow : Window
     {
         Visibility = visible ? Visibility.Visible : Visibility.Hidden;
     }
+
+    public void SetPresentationMode(bool enabled)
+    {
+        Dispatcher.VerifyAccess();
+        var previous = presentationMode;
+        presentationMode = enabled;
+        try { ApplyCaptureVisibility(); }
+        catch { presentationMode = previous; throw; }
+    }
+
+    public async Task<T> CaptureWithoutMarkersAsync<T>(Func<Task<T>> capture)
+    {
+        Dispatcher.VerifyAccess();
+        ArgumentNullException.ThrowIfNull(capture);
+        ownCaptureDepth++;
+        try
+        {
+            ApplyCaptureVisibility();
+            return await capture();
+        }
+        finally
+        {
+            ownCaptureDepth--;
+            ApplyCaptureVisibility();
+        }
+    }
+
+    private void ApplyCaptureVisibility()
+    {
+        if (windowSource is null) return;
+        var affinity = presentationMode && ownCaptureDepth == 0 ? 0u : WdaExcludeFromCapture;
+        if (appliedAffinity == affinity) return;
+        if (!SetWindowDisplayAffinity(windowSource.Handle, affinity))
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "Aufnahmesichtbarkeit der Markierungen konnte nicht geaendert werden.");
+        // Wait for the compositor before the screen capture starts or streaming resumes.
+        Marshal.ThrowExceptionForHR(DwmFlush());
+        appliedAffinity = affinity;
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmFlush();
 
     public void ShowResults(
         IReadOnlyList<AnalysisResult> analysisResults,
@@ -157,7 +201,7 @@ public partial class DetectionOverlayWindow : Window
             windowSource.Handle,
             GwlExStyle,
             new IntPtr(currentStyle | WsExNoActivate | WsExToolWindow | WsExTransparent));
-        _ = SetWindowDisplayAffinity(windowSource.Handle, WdaExcludeFromCapture);
+        ApplyCaptureVisibility();
     }
 
     protected override void OnClosed(EventArgs e)
@@ -166,6 +210,7 @@ public partial class DetectionOverlayWindow : Window
         if (windowSource is not null)
         {
             windowSource.RemoveHook(WindowSourceHook);
+            windowSource = null;
         }
 
         base.OnClosed(e);

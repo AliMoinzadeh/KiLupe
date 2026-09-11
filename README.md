@@ -104,3 +104,9 @@ Die Datei `kilupe.config.json` legt die Startauswahl fest:
 Beim Entwickeln die Datei im Projektordner bearbeiten; der Build kopiert sie neben die EXE. Bei einer verteilten App die Datei neben `KiLupeDemo.exe` bearbeiten. Die App liest die Datei bei jedem Start aus ihrem Programmverzeichnis, unabhaengig vom Arbeitsverzeichnis.
 
 Fehlende Felder oder eine fehlende Datei verwenden die bisherigen Standardwerte. Bei ungueltigem JSON, unbekannten Einstellungen oder ungueltigen Werten verwendet die App die Standardwerte und zeigt einen Hinweis im Statusbereich. Modellnamen waehlen vorhandene Modelle aus; fehlende Modelldateien werden weiterhin in der Modellauswahl gemeldet. Aenderungen an den Dropdowns gelten fuer die laufende Sitzung und werden nicht in die Datei zurueckgeschrieben.
+
+## Vorfuehren im Video-Call
+
+Im Hauptfenster unten rechts **Video-Call** aktivieren, dann den Schwebemodus starten (oder den Schalter waehrenddessen umlegen). Im Konferenzprogramm den **ganzen Bildschirm** freigeben: Die Markierungen liegen in einem eigenen transparenten Fenster und gehoeren nicht zum Fenster des darunterliegenden Programms.
+
+Der Schalter erlaubt Bildschirmaufnahmen der Markierungen und ihrer Hover-Vorschlaege. Fuer die kurzen eigenen Analyseaufnahmen schliesst KiLupe sie voruebergehend wieder aus, damit keine eigenen Markierungen oder Labels in die OCR gelangen. Im Stream kann dadurch ein kurzes Aussetzen sichtbar sein. Fuer eine ruhige Erklaerung den Mauszeiger im Textbereich belassen und den Bildschirm-Inhalt unveraendert lassen. Ohne Video-Call-Modus bleiben die Markierungen von Aufnahmen ausgeschlossen. Der Schalter gilt fuer die laufende Sitzung.
