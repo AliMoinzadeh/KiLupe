@@ -195,3 +195,5 @@ Automatisierte Tests: `dotnet test tests/KiLupeDemo.Tests`.
 Freiwilliger Desktop-Smoke-Test mit eigenem Textfenster: `dotnet run --project tests/PredictionSmoke`.
 Lokaler Modell-Smoke-Test: `dotnet run --project tests/PredictionSmoke -- --model`.
 Der Desktop-Test benoetigt eine interaktive Sitzung mit erlaubtem Vordergrundfokus und tippt ausschliesslich in sein eigenes Testfenster.
+
+Die Vorhersage setzt jetzt den vorgegebenen Dokumenttext direkt fort, statt eine Chat-Antwort auf den Text zu erzeugen. Angebrochene Woerter werden an einer Wortgrenze erzeugt und gegen den bereits getippten Teil geprueft. Wiederholter Folgetext wird entfernt; bei fehlender passender Ergaenzung bleibt das Overlay leer. Das lokale Modell bleibt unveraendert. Den dokumentierten Vorher-/Nachher-Vergleich und den wiederholbaren Testlauf beschreibt [docs/prediction-quality.md](docs/prediction-quality.md).

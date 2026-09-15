@@ -33,7 +33,7 @@ public sealed class PredictionSession
     public bool Complete(long generation, string text)
     {
         if (generation != Generation || Context is null) return false;
-        var insertion = PredictionText.GetInsertion(text, Context.Before);
+        var insertion = PredictionText.GetInsertion(text, Context.Before, Context.After);
         Suggestion = string.IsNullOrWhiteSpace(insertion) ? null : insertion;
         return Suggestion is not null;
     }
@@ -58,7 +58,7 @@ public sealed class PredictionSession
 
 public static class PredictionText
 {
-    public static string GetInsertion(string response, string before)
+    public static string GetInsertion(string response, string before, string after = "")
     {
         // The model sees at most this suffix of the document. Match whole sentence/
         // paragraph prefixes, not arbitrary character overlaps ("das" / "schoen").
@@ -78,9 +78,40 @@ public static class PredictionText
                 if (insertion.Length > 0 && char.IsLetterOrDigit(prefix[^1]) && char.IsLetterOrDigit(insertion[0])) continue;
                 insertion = insertion.TrimStart();
             }
-            return Normalize(insertion);
+            return NormalizeInsertion(insertion, after);
         }
-        return Normalize(response);
+        return NormalizeInsertion(response, after);
+    }
+
+    private static string NormalizeInsertion(string response, string after)
+    {
+        var normalized = Normalize(response, preserveTrailingSpace: after.Length > 0);
+        if (after.Length == 0) return normalized;
+        var following = after.TrimStart();
+        var candidate = normalized.TrimEnd();
+        var existingLine = following.Split('\r', '\n')[0];
+        var repeatedAt = existingLine.Length >= 3 ? candidate.IndexOf(existingLine, StringComparison.OrdinalIgnoreCase) : -1;
+        var repeatedEnd = repeatedAt + existingLine.Length;
+        if (repeatedAt >= 0
+            && (repeatedAt == 0 || !char.IsLetterOrDigit(candidate[repeatedAt - 1]))
+            && (repeatedEnd == candidate.Length || !char.IsLetterOrDigit(existingLine[^1]) || !char.IsLetterOrDigit(candidate[repeatedEnd])))
+        {
+            var missing = candidate[..repeatedAt];
+            return char.IsWhiteSpace(after[0]) ? missing.TrimEnd() : missing;
+        }
+        for (var length = Math.Min(candidate.Length, following.Length); length > 0; length--)
+        {
+            var start = candidate.Length - length;
+            if (!candidate.AsSpan(start).Equals(following.AsSpan(0, length), StringComparison.OrdinalIgnoreCase)) continue;
+            // Only remove complete words/punctuation, never shared word endings.
+            if (start > 0 && char.IsLetterOrDigit(candidate[start - 1]) && char.IsLetterOrDigit(following[0])) continue;
+            if (length < following.Length && char.IsLetterOrDigit(following[length - 1]) && char.IsLetterOrDigit(following[length])) continue;
+            if (length < 3 && following[..length].Any(char.IsLetterOrDigit)) continue;
+            normalized = candidate[..start];
+            break;
+        }
+        if (char.IsWhiteSpace(after[0])) normalized = normalized.TrimEnd();
+        return normalized;
     }
 
     private static int MatchPrefix(string prefix, string response)
@@ -105,7 +136,7 @@ public static class PredictionText
         }
         return target;
     }
-    public static string Normalize(string response)
+    public static string Normalize(string response, bool preserveTrailingSpace = false)
     {
         foreach (var marker in new[] { "<|im_end|>", "<|endoftext|>" })
         {
@@ -113,7 +144,8 @@ public static class PredictionText
             if (index >= 0) response = response[..index];
         }
         if (response.Contains("<|", StringComparison.Ordinal) || response.Contains("```", StringComparison.Ordinal)) return "";
-        response = response.TrimStart('\r', '\n').Split('\r', '\n')[0].TrimEnd();
+        response = response.TrimStart('\r', '\n').Split('\r', '\n')[0];
+        if (!preserveTrailingSpace) response = response.TrimEnd();
         if (response.Any(char.IsControl) || response.Length > 240) return "";
         return response;
     }
