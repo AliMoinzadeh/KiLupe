@@ -57,7 +57,7 @@ Im Normalmodus:
 - `Text pruefen` verwendet lokales Tesseract sowie deutsche und englische Hunspell-Woerterbuecher.
 - Die Auswahlfelder erlauben YOLOv8n oder RT-DETR, Auto/DirectML/CPU sowie keine Korrektur, das deutsche T5-Modell oder das lokale Qwen-LLM. Nicht vorhandene Artefakte bleiben sichtbar, werden aber als nicht verfuegbar gemeldet.
 - Bei aktiver Textkorrektur werden erkannte OCR-Zeilen lokal geprueft; nur geaenderte Vorschlaege erscheinen unterhalb der Bildflaeche im linken Arbeitsbereich. Das vorhandene T5-Modell ist vor allem fuer Rechtschreibung sowie Gross-/Zeichensetzung geeignet und ersetzt noch keine allgemeine Grammatikpruefung. Die Hoehe kann per Trennlinie angepasst werden; der Text kann vollstaendig oder markiert kopiert werden.
-- Bei einer geladenen Textdatei prueft `Text pruefen` jede nicht leere Zeile direkt mit dem ausgewaehlten T5- oder Local-LLM-Dienst. Textdateien erhalten keine Bildrechtecke oder OCR-Marker; die Quelldatei bleibt unveraendert und Vorschlaege werden nur im Korrekturbereich angezeigt.
+- Bei einer geladenen Textdatei prueft `Text pruefen` die Rechtschreibung und ergaenzt Vorschlaege des ausgewaehlten Modells. Alle gefundenen Fehlerstellen werden gleichzeitig gelb im Text markiert, auch ohne Auswahl in der Trefferliste. Scrollen und Zeilenumbruch werden beruecksichtigt; beim Bearbeiten verschwinden veraltete Markierungen. Die Markierungen werden nicht in der Datei gespeichert.
 - Fehlende Modelle oder Sprachdaten werden als Status angezeigt; die Lupe bleibt nutzbar.
 
 Mit `Strg+Alt+L` oder `Schwebemodus` wird das Hauptfenster ausgeblendet und die Orb-Leiste ueber der Taskleiste aktiviert:
@@ -134,7 +134,7 @@ Die Erkennung ist modellabhaengig und kann sich irren. OCR-Zeilen werden einzeln
 beurteilt; insbesondere bei abgeschnittenen Saetzen kann dadurch eine echte
 Grammatikkorrektur ausbleiben. Ohne lesbare Woerterbuecher werden keine
 Fragmentkorrekturen zugelassen. OCR- und Rechtschreibtreffer erscheinen weiterhin
-direkt in den bisherigen Kaestchen, auch im Schwebemodus. Die Suche wartet nicht
+direkt als gelbe Fehlermarker, auch im Schwebemodus. Die Suche wartet nicht
 auf eine Modellbestaetigung und blendet keine ganzen OCR-Zeilen wegen einer
 Konfidenzschwelle aus. Die korrigierte Woerterbuchpruefung akzeptiert deutsche
 Substantive wie Ansicht und Datei in ihrer originalen Grossschreibung.
@@ -161,3 +161,14 @@ Ein opt-in Qualitaetstest prueft zehn kurze Beispiele gegen das echte lokale Mod
 $env:KILUPE_TEST_MODEL = (Resolve-Path 'artifacts/models/qwen2.5-3b-instruct/Qwen2.5-3B-Instruct-Q4_K_M.gguf').Path
 dotnet test tests/KiLupeDemo.Tests --filter FullyQualifiedName~ContextualCorrectionModelTests
 ```
+
+### Textdateien pruefen und Fehlermarker
+
+`Text pruefen` prueft geladene Textdateien zuerst mit den lokalen deutschen und
+englischen Woerterbuechern. Diese Treffer bleiben auch ohne Korrekturmodell oder
+bei einer leeren Modellantwort erhalten. Ein gewaehltes Modell ergaenzt danach
+seine Vorschlaege. Ein Klick auf einen Treffer waehlt die Textstelle im Editor aus.
+
+Rechtschreibfehler in geladenen Bildern erscheinen als transparente gelbe
+Markerflaechen in Wortgroesse, wie im Schwebemodus. Rohe OCR-Texttreffer werden
+nicht mehr als gruene Kaestchen im Bild gezeichnet. Objektmarkierungen bleiben Kaestchen.

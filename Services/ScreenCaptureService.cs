@@ -23,7 +23,9 @@ public sealed class ScreenCaptureService
         return CaptureCursorFrame(size).Image;
     }
 
-    public ScreenCaptureFrame CaptureCursorFrame(int size = 320)
+    public ScreenCaptureFrame CaptureCursorFrame(int size = 320) => CaptureCursorFrame(size, size);
+
+    public ScreenCaptureFrame CaptureCursorFrame(int width, int height)
     {
         if (!GetCursorPos(out var cursorPosition))
         {
@@ -38,7 +40,7 @@ public sealed class ScreenCaptureService
             screen.Top,
             screen.Width,
             screen.Height,
-            size);
+            width, height);
         return new ScreenCaptureFrame(Capture(region), region);
     }
 
@@ -136,7 +138,11 @@ public sealed class ScreenCaptureService
         int screenTop,
         int screenWidth,
         int screenHeight,
-        int size)
+        int size) => CalculateCursorRegion(centerX, centerY, screenLeft, screenTop, screenWidth, screenHeight, size, size);
+
+    public static CaptureRegion CalculateCursorRegion(
+        int centerX, int centerY, int screenLeft, int screenTop,
+        int screenWidth, int screenHeight, int requestedWidth, int requestedHeight)
     {
         if (screenWidth <= 0)
         {
@@ -148,13 +154,13 @@ public sealed class ScreenCaptureService
             throw new ArgumentOutOfRangeException(nameof(screenHeight));
         }
 
-        if (size <= 0)
+        if (requestedWidth <= 0 || requestedHeight <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(size));
+            throw new ArgumentOutOfRangeException(nameof(requestedWidth));
         }
 
-        var width = Math.Min(size, screenWidth);
-        var height = Math.Min(size, screenHeight);
+        var width = Math.Min(requestedWidth, screenWidth);
+        var height = Math.Min(requestedHeight, screenHeight);
         var left = Math.Clamp(centerX - width / 2, screenLeft, screenLeft + screenWidth - width);
         var top = Math.Clamp(centerY - height / 2, screenTop, screenTop + screenHeight - height);
         return new CaptureRegion(left, top, width, height);

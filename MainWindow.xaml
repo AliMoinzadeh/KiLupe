@@ -105,6 +105,7 @@
                        VerticalAlignment="Center"
                        Foreground="#9AA9A4"
                        FontSize="16" />
+            <AdornerDecorator x:Name="TextDocumentDecorator" Visibility="Collapsed">
                 <TextBox x:Name="WorkspaceTextDocument"
                    TextChanged="WorkspaceTextDocument_TextChanged"
                    IsInactiveSelectionHighlightEnabled="True"
@@ -121,6 +122,7 @@
                    VerticalContentAlignment="Top"
                    VerticalScrollBarVisibility="Auto"
                    Visibility="Collapsed" />
+            </AdornerDecorator>
             <Image x:Name="WorkspaceImage"
                    Stretch="Uniform"
                  Visibility="Collapsed"

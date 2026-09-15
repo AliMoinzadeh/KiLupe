@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -45,7 +46,11 @@ public partial class MainWindow : Window
     private BitmapSource? currentImage;
     private TextDocument? currentTextDocument;
     private readonly TextDocumentLoader textDocumentLoader = new();
+    private readonly TextDocumentSpellingService textSpellingService = new();
     private WorkspaceContentMode workspaceContentMode;
+    private TextErrorAdorner? textErrorAdorner;
+    private CancellationTokenSource? spellingCancellation;
+    private bool highlightUpdatePending;
 
     private sealed record ProviderChoice(
         InferenceProviderKind Id,
@@ -71,6 +76,17 @@ public partial class MainWindow : Window
         InitializeComponent();
         SetWorkspaceContentMode(WorkspaceContentMode.None);
         ResultsList.ItemsSource = results;
+        results.CollectionChanged += (_, _) =>
+        {
+            if (highlightUpdatePending) return;
+            highlightUpdatePending = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                highlightUpdatePending = false;
+                UpdateTextHighlights();
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        };
+        WorkspaceTextDocument.Loaded += (_, _) => UpdateTextHighlights();
         var startupConfiguration = StartupConfigurationLoader.Load(
             Path.Combine(AppContext.BaseDirectory, StartupConfigurationLoader.FileName));
         analysisConfiguration = startupConfiguration.Configuration;
@@ -217,6 +233,7 @@ public partial class MainWindow : Window
         WorkspaceImage.Visibility = showImage
             ? Visibility.Visible
             : Visibility.Collapsed;
+        TextDocumentDecorator.Visibility = showText ? Visibility.Visible : Visibility.Collapsed;
         WorkspaceTextDocument.Visibility = showText
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -389,19 +406,42 @@ public partial class MainWindow : Window
                 return;
             }
 
-            StatusText.Text = "Textkorrektur laeuft...";
+            results.Clear();
+            ClearCorrections();
+            using var spellingRequest = new CancellationTokenSource();
+            spellingCancellation = spellingRequest;
             var generation = correctionGeneration;
-            await ApplyCorrectionsAsync(document, CancellationToken.None);
+            StatusText.Text = "Rechtschreibpruefung laeuft...";
+            IReadOnlyList<AnalysisResult> spellingResults;
+            try
+            {
+                spellingResults = await Task.Run(() => textSpellingService.Analyze(document.Text, spellingRequest.Token), spellingRequest.Token);
+            }
+            catch (OperationCanceledException) { return; }
+            finally
+            {
+                if (ReferenceEquals(spellingCancellation, spellingRequest)) spellingCancellation = null;
+            }
+            if (generation != correctionGeneration || !ReferenceEquals(currentTextDocument, document)) return;
+            foreach (var error in spellingResults) results.Add(error);
+            UpdateTextHighlights();
+            ResultCountText.Text = $"{results.Count} Treffer";
+            StatusText.Text = $"{results.Count} Rechtschreibtreffer. Textkorrektur laeuft...";
+            var correctionError = await ApplyCorrectionsAsync(document, CancellationToken.None);
             if (generation == correctionGeneration
                 && ReferenceEquals(currentTextDocument, document))
             {
                 StatusText.Text = string.IsNullOrWhiteSpace(document.Text)
                     ? "Die Textdatei ist leer."
-                    : correctionCoordinator is null
-                        ? textCorrectionService?.StatusText ?? "Textkorrektur ist nicht verfuegbar."
-                        : correctionPresentationState.IsVisible
-                            ? "Korrekturvorschlaege bereit."
-                            : "Keine Korrekturvorschlaege gefunden.";
+                    : correctionError is not null
+                        ? $"{results.Count} Rechtschreibtreffer. Modellkorrektur fehlgeschlagen: {correctionError}"
+                        : correctionCoordinator is null
+                            ? $"{results.Count} Rechtschreibtreffer. {textCorrectionService?.StatusText ?? "Kein Korrekturmodell ausgewaehlt."}"
+                            : results.Count > 0
+                                ? $"{results.Count} Treffer. Textpruefung abgeschlossen."
+                                : textSpellingService.IsAvailable
+                                    ? "Keine Korrekturvorschlaege gefunden."
+                                    : "Woerterbuecher fehlen; das Modell hat keine Korrekturvorschlaege geliefert.";
             }
 
             return;
@@ -751,7 +791,7 @@ public partial class MainWindow : Window
         Task<ScreenCaptureFrame> Capture() => Task.Run(
             () => IsFullScreenMode(mode)
                 ? screenCaptureService.CaptureVirtualScreenFrame()
-                : screenCaptureService.CaptureCursorFrame(),
+                : mode == FloatingAnalysisMode.TextCursor ? screenCaptureService.CaptureCursorFrame(960, 320) : screenCaptureService.CaptureCursorFrame(),
             cancellationToken);
         return detectionOverlayWindow is { } markers
             ? markers.CaptureWithoutMarkersAsync(Capture)
@@ -796,7 +836,7 @@ public partial class MainWindow : Window
             parentCancellation);
     }
 
-    private Task ApplyCorrectionsAsync(
+    private Task<string?> ApplyCorrectionsAsync(
         TextDocument document,
         CancellationToken parentCancellation)
     {
@@ -808,7 +848,7 @@ public partial class MainWindow : Window
             parentCancellation);
     }
 
-    private async Task ApplyCorrectionsAsync(
+    private async Task<string?> ApplyCorrectionsAsync(
         long requestId,
         Func<CorrectionCoordinator, CancellationToken, Task<IReadOnlyList<CorrectionSuggestion>>> createSuggestions,
         CancellationToken parentCancellation)
@@ -823,7 +863,7 @@ public partial class MainWindow : Window
         {
             correctionPresentationState.Clear(requestId);
             UpdateCorrectionSurface();
-            return;
+            return null;
         }
 
         var operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -835,18 +875,20 @@ public partial class MainWindow : Window
             if (generation != correctionGeneration
                 || operationCancellation.IsCancellationRequested)
             {
-                return;
+                return null;
             }
 
             if (workspaceContentMode == WorkspaceContentMode.Text && currentTextDocument is not null)
             {
-                results.Clear();
+
                 var searchStart = 0;
                 foreach (var suggestion in suggestions)
                 {
                     var start = currentTextDocument.Text.IndexOf(suggestion.OriginalText, searchStart, StringComparison.Ordinal);
                     if (start < 0 || suggestion.OriginalText.Length == 0) continue;
                     searchStart = start + suggestion.OriginalText.Length;
+                    foreach (var existing in results.Where(result => result.Bounds.X >= start
+                        && result.Bounds.Right <= start + suggestion.OriginalText.Length).ToArray()) results.Remove(existing);
                     results.Add(new AnalysisResult(AnalysisKind.Spelling, suggestion.OriginalText, 1,
                         new Rect(start, 0, suggestion.OriginalText.Length, 1), suggestion.CorrectedText));
                 }
@@ -866,6 +908,7 @@ public partial class MainWindow : Window
                 CorrectionStatusText.Text = $"Korrektur fehlgeschlagen: {exception.Message}";
                 UpdateCorrectionSurface();
             }
+            return exception.Message;
         }
         finally
         {
@@ -875,6 +918,7 @@ public partial class MainWindow : Window
                 operationCancellation.Dispose();
             }
         }
+        return null;
     }
 
     private void UpdateCorrectionSurface()
@@ -1015,6 +1059,8 @@ public partial class MainWindow : Window
 
     private void ClearCorrections()
     {
+        spellingCancellation?.Cancel();
+        UpdateTextHighlights();
         correctionCancellation?.Cancel();
         correctionPresentationState = new CorrectionPresentationState();
         correctionGeneration++;
@@ -1148,6 +1194,19 @@ public partial class MainWindow : Window
         RenderResultOverlays();
     }
 
+    private void UpdateTextHighlights()
+    {
+        if (textErrorAdorner is null)
+        {
+            var layer = AdornerLayer.GetAdornerLayer(WorkspaceTextDocument);
+            if (layer is null) return;
+            textErrorAdorner = new TextErrorAdorner(WorkspaceTextDocument);
+            layer.Add(textErrorAdorner);
+        }
+        textErrorAdorner.SetResults(workspaceContentMode == WorkspaceContentMode.Text
+            ? results : Array.Empty<AnalysisResult>());
+    }
+
     private void RenderResultOverlays()
     {
         ResultsCanvas.Children.Clear();
@@ -1157,32 +1216,14 @@ public partial class MainWindow : Window
         }
 
         var imageRect = GetDisplayedImageRect();
-        foreach (var result in results.Where(result =>
-                     result.Kind != AnalysisKind.Status && !result.Bounds.IsEmpty))
+        foreach (var result in ImageResultMarkerFactory.VisibleResults(results))
         {
             var left = imageRect.Left + result.Bounds.Left * imageRect.Width / currentImage.PixelWidth;
             var top = imageRect.Top + result.Bounds.Top * imageRect.Height / currentImage.PixelHeight;
-            var width = Math.Max(42, result.Bounds.Width * imageRect.Width / currentImage.PixelWidth);
-            var height = Math.Max(26, result.Bounds.Height * imageRect.Height / currentImage.PixelHeight);
+            var width = result.Bounds.Width * imageRect.Width / currentImage.PixelWidth;
+            var height = result.Bounds.Height * imageRect.Height / currentImage.PixelHeight;
             var selected = ReferenceEquals(ResultsList.SelectedItem, result);
-            var accent = selected ? Colors.Yellow : result.Kind == AnalysisKind.Spelling ? Colors.OrangeRed : Colors.LightGreen;
-            var border = new Border
-            {
-                Width = width,
-                Height = height,
-                BorderBrush = new SolidColorBrush(accent),
-                BorderThickness = new Thickness(selected ? 4 : 2),
-                Background = new SolidColorBrush(Color.FromArgb(42, accent.R, accent.G, accent.B)),
-                CornerRadius = new CornerRadius(4),
-                Child = new TextBlock
-                {
-                    Text = result.Label,
-                    Foreground = new SolidColorBrush(accent),
-                    Background = new SolidColorBrush(Color.FromArgb(190, 16, 22, 20)),
-                    Padding = new Thickness(4, 2, 4, 2),
-                    VerticalAlignment = VerticalAlignment.Top
-                }
-            };
+            var border = ImageResultMarkerFactory.Create(result, new Rect(left, top, width, height), selected);
             Canvas.SetLeft(border, left);
             Canvas.SetTop(border, top);
             ResultsCanvas.Children.Add(border);
