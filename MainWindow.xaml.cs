@@ -97,6 +97,7 @@ public partial class MainWindow : Window
             analysisConfiguration);
         correctionCoordinator = CreateCorrectionCoordinator(textCorrectionService);
         InitializeModelSelectors();
+        InitializePrediction();
         UpdateModelStatus();
         if (startupConfiguration.Warning is not null)
         {
@@ -1239,6 +1240,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         closing = true;
+        predictionController?.Dispose();
         StopFloatingMode(restoreWindow: false);
         globalHotkeyService?.Dispose();
         correctionCancellation?.Cancel();

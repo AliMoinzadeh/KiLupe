@@ -172,3 +172,26 @@ seine Vorschlaege. Ein Klick auf einen Treffer waehlt die Textstelle im Editor a
 Rechtschreibfehler in geladenen Bildern erscheinen als transparente gelbe
 Markerflaechen in Wortgroesse, wie im Schwebemodus. Rohe OCR-Texttreffer werden
 nicht mehr als gruene Kaestchen im Bild gezeichnet. Objektmarkierungen bleiben Kaestchen.
+## Vorhersagemodus
+
+Im rechten Bereich **Vorhersagemodus ...** oeffnen und **Vorhersagemodus aktivieren** einschalten. Anschliessend in einem anderen Programm schreiben. Nach standardmaessig 700 ms Schreibpause berechnet das lokale Qwen-Modell eine kurze Ergaenzung; beim ersten Aufruf kommt die Ladezeit hinzu.
+
+- Der Vorschlag ist ein separates, nicht fokussierendes Overlay und veraendert den Text nicht.
+- Am Zeilenende erscheint Ghost Text, sofern ausreichend Platz vorhanden ist; mitten im Text oder bei Platzmangel eine kleine Flaeche unter dem Cursor.
+- **Einfuegen per Tastenkuerzel erlauben** ist standardmaessig ausgeschaltet. Mit dieser Erlaubnis uebernimmt **Strg+Alt+Leertaste** den aktuellen Vorschlag. Tasten loslassen, damit keine gedrueckten Modifikatoren die Eingabe beeinflussen.
+- Pause (300–5000 ms), Shortcut und ausgeschlossene Programme lassen sich im Dialog einstellen. Programmnamen mit oder ohne `.exe`, getrennt durch Komma oder Semikolon. Strg+Alt+L bleibt fuer die Lupe reserviert.
+- Einstellungen werden unter `%LOCALAPPDATA%\KiLupe\prediction.json` gespeichert. Textkontext wird weder dort gespeichert noch an einen Cloud-Dienst gesendet.
+- Cursor-, Text- und Fensterwechsel verwerfen alte Vorschlaege. Vor der Uebernahme wird das aktive Feld erneut gelesen; unsichere oder veraltete Vorschlaege werden nicht eingefuegt. Die Zwischenablage wird nicht verwendet.
+
+Voraussetzung ist das vorhandene lokale Modell `Qwen2.5-3B-Instruct-Q4_K_M.gguf`. Der Vorhersagemodus arbeitet unabhaengig von der ausgewaehlten Textkorrektur. Das Modell wird bei Bedarf geladen; die Berechnung erfolgt auf der CPU.
+
+### Grenzen und Tests
+
+Unterstuetzt werden beschreibbare Windows-Textfelder, die Text, eine kollabierte Auswahl und sichtbare Cursorgeometrie ueber UI Automation bzw. den Windows-Textcursor bereitstellen. Passwortfelder, markierter Text, eigene KiLupe-Fenster, ausgeschlossene Programme und Textfelder mit mehr als 20.000 Zeichen werden uebersprungen. Programme ohne diese Schnittstellen (z. B. manche Spezialeditoren oder Remote-Oberflaechen) werden nicht per OCR erraten. Eingaben in Programme mit hoeheren Berechtigungen koennen durch Windows blockiert werden. Nach unbestaetigter Eingabe erfolgt kein automatischer Wiederholungsversuch.
+
+Die erneute Kontextpruefung und die Betriebssystemeingabe sind keine atomare Transaktion: ein Fokuswechsel genau dazwischen laesst sich systemweit nicht vollstaendig ausschliessen. Vorschlagsqualitaet und Reaktionszeit haengen vom lokalen Modell und Rechner ab.
+
+Automatisierte Tests: `dotnet test tests/KiLupeDemo.Tests`.
+Freiwilliger Desktop-Smoke-Test mit eigenem Textfenster: `dotnet run --project tests/PredictionSmoke`.
+Lokaler Modell-Smoke-Test: `dotnet run --project tests/PredictionSmoke -- --model`.
+Der Desktop-Test benoetigt eine interaktive Sitzung mit erlaubtem Vordergrundfokus und tippt ausschliesslich in sein eigenes Testfenster.

@@ -291,6 +291,10 @@
                       SelectionChanged="ModelSelector_SelectionChanged"
                       Background="#1B2923"
                       Foreground="#102019" />
+            <Button Content="Vorhersagemodus ..." Click="PredictionSettings_Click"
+                    Margin="0,0,0,5" Padding="8,5" />
+            <TextBlock x:Name="PredictionStatusText" Text="Vorhersage ausgeschaltet."
+                       TextWrapping="Wrap" Foreground="#9AA9A4" FontSize="11" Margin="0,0,0,10" />
             <TextBlock x:Name="ModelStatusText"
                        Margin="0,7,0,12"
                        Foreground="#9AA9A4"
