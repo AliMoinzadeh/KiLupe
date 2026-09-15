@@ -1,6 +1,7 @@
 using System.Text;
 using System.IO;
 using KiLupeDemo.Models;
+using WeCantSpell.Hunspell;
 using LLama;
 using LLama.Abstractions;
 using LLama.Common;
@@ -19,6 +20,7 @@ public sealed class LocalLlamaTextCorrectionService : ITextCorrectionService
         + "Behalte Inhalt, Namen und Zahlen. Gib nur den korrigierten deutschen Text aus, "
         + "ohne Erklaerung, Markdown oder Alternativen.";
 
+    private readonly Lazy<Func<string, bool>> isMisspelled = new(LoadSpellingCheck);
     private readonly object stateLock = new();
     private readonly SemaphoreSlim inferenceGate = new(1, 1);
     private readonly ModelParams modelParameters;
@@ -27,8 +29,9 @@ public sealed class LocalLlamaTextCorrectionService : ITextCorrectionService
     private int disposed;
     private string statusText;
 
-    public LocalLlamaTextCorrectionService(string modelPath)
+    public LocalLlamaTextCorrectionService(string modelPath, bool contextAwareCorrection = false)
     {
+        ContextAwareCorrection = contextAwareCorrection;
         ModelPath = modelPath ?? throw new ArgumentNullException(nameof(modelPath));
         modelParameters = new ModelParams(ModelPath)
         {
@@ -45,6 +48,8 @@ public sealed class LocalLlamaTextCorrectionService : ITextCorrectionService
     public string ModelId => "qwen2.5-3b-instruct-gguf";
 
     public string ModelPath { get; }
+
+    public bool ContextAwareCorrection { get; }
 
     public bool IsAvailable => Volatile.Read(ref disposed) == 0
         && !loadFailed
@@ -106,6 +111,8 @@ public sealed class LocalLlamaTextCorrectionService : ITextCorrectionService
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (ContextAwareCorrection && !text.Trim().Any(char.IsWhiteSpace) && !isMisspelled.Value(text))
+                return null;
             var loadedWeights = GetOrLoadWeights();
             if (loadedWeights is null)
             {
@@ -115,7 +122,7 @@ public sealed class LocalLlamaTextCorrectionService : ITextCorrectionService
             using var context = loadedWeights.CreateContext(modelParameters);
             var executor = new InteractiveExecutor(context);
             var history = new ChatHistory();
-            history.AddMessage(AuthorRole.System, SystemPrompt);
+            history.AddMessage(AuthorRole.System, ContextAwareCorrection ? ContextualCorrectionPolicy.SystemPrompt : SystemPrompt);
             var session = new ChatSession(executor, history)
             {
                 HistoryTransform = new QwenChatHistoryTransform()
@@ -154,6 +161,8 @@ public sealed class LocalLlamaTextCorrectionService : ITextCorrectionService
             }
 
             var correctedText = NormalizeResponse(response.ToString());
+            if (ContextAwareCorrection)
+                correctedText = ContextualCorrectionPolicy.ReadCorrection(text, correctedText, isMisspelled.Value);
             if (string.IsNullOrWhiteSpace(correctedText)
                 || IsRoleMarkerOnly(correctedText)
                 || string.Equals(text, correctedText, StringComparison.Ordinal))
@@ -319,6 +328,24 @@ public sealed class LocalLlamaTextCorrectionService : ITextCorrectionService
         }
     }
 
+    private static Func<string, bool> LoadSpellingCheck()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        var dictionaries = new List<WordList>();
+        foreach (var name in new[] { "de_DE", "en_US" })
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "dictionaries", name + ".dic");
+            if (!File.Exists(path) || !File.Exists(Path.ChangeExtension(path, ".aff")))
+                continue;
+            try { dictionaries.Add(WordList.CreateFromFiles(path)); }
+            catch (Exception exception) when (exception is IOException or ArgumentException or UnauthorizedAccessException)
+            {
+                // Missing/unreadable dictionaries must not permit grammar edits in fragments.
+            }
+        }
+        var checker = new SpellingChecker(word => dictionaries.Any(dictionary => dictionary.Check(word)), null);
+        return word => dictionaries.Count > 0 && checker.IsMisspelled(word);
+    }
     private void SetStatus(string value)
     {
         lock (stateLock)

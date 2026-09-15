@@ -61,7 +61,8 @@ public static class AnalysisServiceFactory
                 configuration.Provider),
             TextCorrectionModelKind.LocalLlm => new LocalLlamaTextCorrectionService(
                 option.ModelPath
-                    ?? GetExpectedCorrectionModelPath(configuration.TextCorrectionModel, modelRoot)),
+                    ?? GetExpectedCorrectionModelPath(configuration.TextCorrectionModel, modelRoot),
+                configuration.ContextAwareCorrection),
             _ => throw new InvalidOperationException(
                 $"Unbekanntes Textkorrekturmodell: {configuration.TextCorrectionModel}")
         };

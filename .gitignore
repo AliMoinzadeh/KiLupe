@@ -18,3 +18,8 @@ obj/
 # Local evaluation output
 *.log
 test-output.txt
+
+# C# domain models are source files, not downloaded model weights.
+!Models/
+Models/*
+!Models/*.cs

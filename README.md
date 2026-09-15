@@ -110,3 +110,54 @@ Fehlende Felder oder eine fehlende Datei verwenden die bisherigen Standardwerte.
 Im Hauptfenster unten rechts **Video-Call** aktivieren, dann den Schwebemodus starten (oder den Schalter waehrenddessen umlegen). Im Konferenzprogramm den **ganzen Bildschirm** freigeben: Die Markierungen liegen in einem eigenen transparenten Fenster und gehoeren nicht zum Fenster des darunterliegenden Programms.
 
 Der Schalter erlaubt Bildschirmaufnahmen der Markierungen und ihrer Hover-Vorschlaege. Fuer die kurzen eigenen Analyseaufnahmen schliesst KiLupe sie voruebergehend wieder aus, damit keine eigenen Markierungen oder Labels in die OCR gelangen. Im Stream kann dadurch ein kurzes Aussetzen sichtbar sein. Fuer eine ruhige Erklaerung den Mauszeiger im Textbereich belassen und den Bildschirm-Inhalt unveraendert lassen. Ohne Video-Call-Modus bleiben die Markierungen von Aufnahmen ausgeschlossen. Der Schalter gilt fuer die laufende Sitzung.
+
+## Kontextabhaengige Textkorrektur
+
+Unter **Textkorrektur** das **lokale Qwen-LLM** waehlen und
+**Kontextabhängig korrigieren** aktivieren. Der Schalter gilt fuer die laufende
+Sitzung. Ohne ihn bleibt die bisherige vollstaendige Korrektur aktiv.
+Das T5-/ONNX-Modell unterstuetzt diesen Modus nicht; bei dieser Auswahl ist der
+Schalter deaktiviert.
+
+- Woerterbuchbekannte Einzelwoerter (z. B. Ansicht, Datei) werden ohne LLM-Aenderung uebernommen.
+- Einzelwoerter, Menueeintraege, Beschriftungen und unklare/abgeschnittene
+  Textfragmente: nur eindeutige Tippfehler.
+- Klarer Satzkontext: auch Grammatik und Zeichensetzung.
+- Das LLM bestimmt den Kontext aus dem erkannten Text. Bei Fragmenten verhindert
+  ein zusaetzlicher Filter neue Satzzeichen, hinzugefuegte/entfernte Woerter und
+  Aenderungen an Woertern, die im deutschen oder englischen Woerterbuch stehen.
+- Die Einstellung gilt fuer OCR aus geladenen Bildern und Bildschirmaufnahmen
+  ebenso wie fuer geladene Textdateien. Es wird keine Schnittstelle der
+  abgebildeten Anwendung und kein visuelles Modell benoetigt.
+
+Die Erkennung ist modellabhaengig und kann sich irren. OCR-Zeilen werden einzeln
+beurteilt; insbesondere bei abgeschnittenen Saetzen kann dadurch eine echte
+Grammatikkorrektur ausbleiben. Ohne lesbare Woerterbuecher werden keine
+Fragmentkorrekturen zugelassen. OCR- und Rechtschreibtreffer erscheinen weiterhin
+direkt in den bisherigen Kaestchen, auch im Schwebemodus. Die Suche wartet nicht
+auf eine Modellbestaetigung und blendet keine ganzen OCR-Zeilen wegen einer
+Konfidenzschwelle aus. Die korrigierte Woerterbuchpruefung akzeptiert deutsche
+Substantive wie Ansicht und Datei in ihrer originalen Grossschreibung.
+Die Prozentangabe beschreibt die OCR-Erkennung, nicht die Sicherheit der Korrektur.
+Die optionale kontextabhaengige LLM-Pruefung betrifft die Korrekturvorschlaege.
+Die einfache Absicherung bekannter Einzelwoerter ist deterministisch. Das kleine
+LLM erkennt dagegen nicht jeden Fehler in stark fehlerhaften Saetzen und ist
+kein zuverlaessiger Erkenner beliebiger UI-Elemente oder unbekannter Eigennamen.
+Fuer den Start mit aktiviertem Modus in `kilupe.config.json` setzen:
+
+```json
+{
+  "objectModel": "RtDetr",
+  "textCorrectionModel": "LocalLlm",
+  "provider": "Auto",
+  "contextAwareCorrection": true
+}
+```
+
+Die automatisierten Schutzregeltests laufen mit der normalen Testsuite.
+Ein opt-in Qualitaetstest prueft zehn kurze Beispiele gegen das echte lokale Modell. Einzelne Satzkorrekturen sind weiterhin nicht zuverlaessig:
+
+```powershell
+$env:KILUPE_TEST_MODEL = (Resolve-Path 'artifacts/models/qwen2.5-3b-instruct/Qwen2.5-3B-Instruct-Q4_K_M.gguf').Path
+dotnet test tests/KiLupeDemo.Tests --filter FullyQualifiedName~ContextualCorrectionModelTests
+```

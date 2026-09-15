@@ -24,6 +24,7 @@ public static class StartupConfigurationLoader
                 {
                     "objectModel" => configuration with { ObjectModel = ReadEnum<ObjectModelKind>(property) },
                     "textCorrectionModel" => configuration with { TextCorrectionModel = ReadEnum<TextCorrectionModelKind>(property) },
+                    "contextAwareCorrection" => configuration with { ContextAwareCorrection = ReadBoolean(property) },
                     "provider" => configuration with { Provider = ReadEnum<InferenceProviderKind>(property) },
                     _ => throw new JsonException($"Unbekannte Einstellung: {property.Name}")
                 };
@@ -43,6 +44,13 @@ public static class StartupConfigurationLoader
             return new(AnalysisConfiguration.Default,
                 $"Startkonfiguration konnte nicht geladen werden ({path}): {exception.Message} Standardwerte werden verwendet.");
         }
+    }
+
+    private static bool ReadBoolean(JsonProperty property)
+    {
+        if (property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            return property.Value.GetBoolean();
+        throw new JsonException($"Ungueltiger Wert fuer {property.Name}. Erlaubt: true, false.");
     }
 
     private static T ReadEnum<T>(JsonProperty property) where T : struct, Enum

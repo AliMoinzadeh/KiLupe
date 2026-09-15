@@ -19,15 +19,15 @@ public sealed class SpellingChecker
 
         var normalized = new string(word
             .Where(character => char.IsLetter(character) || character is '\'' or '-')
-            .ToArray())
-            .ToLowerInvariant();
+            .ToArray());
         if (normalized.Length < 2 || germanCheck is null && englishCheck is null)
         {
             return false;
         }
 
-        var germanKnown = germanCheck?.Invoke(normalized) == true;
-        var englishKnown = englishCheck?.Invoke(normalized) == true;
+        var lower = normalized.ToLowerInvariant();
+        var germanKnown = germanCheck?.Invoke(normalized) == true || germanCheck?.Invoke(lower) == true;
+        var englishKnown = englishCheck?.Invoke(normalized) == true || englishCheck?.Invoke(lower) == true;
         return !germanKnown && !englishKnown;
     }
 }

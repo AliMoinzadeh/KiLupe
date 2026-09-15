@@ -71,17 +71,28 @@ public sealed class LocalTextAnalysisService : IAnalysisService, IDisposable
     {
         ArgumentNullException.ThrowIfNull(image);
 
-        if (engine is null)
+        if (engine is null || cancellationToken.IsCancellationRequested)
         {
             return Task.FromResult<IReadOnlyList<AnalysisResult>>(Array.Empty<AnalysisResult>());
         }
 
-        return Task.Run(() => Analyze(image, cancellationToken), cancellationToken);
+        return Task.Run(() =>
+        {
+            lock (engineLock)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    return (IReadOnlyList<AnalysisResult>)Array.Empty<AnalysisResult>();
+                return Analyze(image, cancellationToken);
+            }
+        });
     }
 
     public void Dispose()
     {
-        engine?.Dispose();
+        lock (engineLock)
+        {
+            engine?.Dispose();
+        }
     }
 
     private WordList? LoadDictionary(string name)
@@ -127,7 +138,8 @@ public sealed class LocalTextAnalysisService : IAnalysisService, IDisposable
         var results = new List<AnalysisResult>();
         do
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            if (cancellationToken.IsCancellationRequested)
+                return Array.Empty<AnalysisResult>();
             var word = iterator.GetText(PageIteratorLevel.Word)?.Trim();
             if (string.IsNullOrWhiteSpace(word)
                 || !iterator.TryGetBoundingBox(PageIteratorLevel.Word, out var bounds))
@@ -135,6 +147,7 @@ public sealed class LocalTextAnalysisService : IAnalysisService, IDisposable
                 continue;
             }
 
+            var confidence = Math.Clamp(iterator.GetConfidence(PageIteratorLevel.Word) / 100.0, 0, 1);
             var imageBounds = new WpfRect(
                 bounds.X1,
                 bounds.Y1,
@@ -143,7 +156,7 @@ public sealed class LocalTextAnalysisService : IAnalysisService, IDisposable
             results.Add(new AnalysisResult(
                 AnalysisKind.Text,
                 word,
-                1,
+                confidence,
                 imageBounds,
                 "Tesseract"));
 
@@ -152,7 +165,7 @@ public sealed class LocalTextAnalysisService : IAnalysisService, IDisposable
                 results.Add(new AnalysisResult(
                     AnalysisKind.Spelling,
                     word,
-                    1,
+                    confidence,
                     imageBounds,
                     string.Join(" / ", (germanDictionary?.Suggest(word) ?? Enumerable.Empty<string>())
                         .Concat(englishDictionary?.Suggest(word) ?? Enumerable.Empty<string>())
@@ -161,7 +174,7 @@ public sealed class LocalTextAnalysisService : IAnalysisService, IDisposable
         }
         while (iterator.Next(PageIteratorLevel.Word));
 
-        return results;
+        return cancellationToken.IsCancellationRequested ? Array.Empty<AnalysisResult>() : results;
     }
 
     private Page ProcessPage(Pix pix)

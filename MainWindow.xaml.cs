@@ -107,6 +107,7 @@ public partial class MainWindow : Window
         initializingModelSelectors = true;
         try
         {
+            ContextAwareCorrectionCheckBox.IsChecked = analysisConfiguration.ContextAwareCorrection;
             ObjectModelSelector.ItemsSource = modelCatalog.ObjectModels;
             TextCorrectionSelector.ItemsSource = modelCatalog.TextCorrectionModels;
             ProviderSelector.ItemsSource = new[]
@@ -142,7 +143,21 @@ public partial class MainWindow : Window
         analysisConfiguration = new AnalysisConfiguration(
             objectModel.Id,
             textModel.Id,
-            provider.Id);
+            provider.Id)
+        {
+            ContextAwareCorrection = ContextAwareCorrectionCheckBox.IsChecked == true
+        };
+        RebuildAnalysisServices();
+    }
+
+    private void ContextAwareCorrection_Changed(object sender, RoutedEventArgs e)
+    {
+        if (initializingModelSelectors || analysisConfiguration is null)
+            return;
+        analysisConfiguration = analysisConfiguration with
+        {
+            ContextAwareCorrection = ContextAwareCorrectionCheckBox.IsChecked == true
+        };
         RebuildAnalysisServices();
     }
 
@@ -189,6 +204,7 @@ public partial class MainWindow : Window
             InferenceProviderKind.Cpu => "CPU angefordert",
             _ => "Auto: DirectML, sonst CPU"
         };
+        ContextAwareCorrectionCheckBox.IsEnabled = analysisConfiguration.TextCorrectionModel == TextCorrectionModelKind.LocalLlm;
         ModelStatusText.Text = $"{objectModel.StatusText} {textModel.StatusText} {providerName}.";
     }
 

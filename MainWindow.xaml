@@ -273,6 +273,13 @@
                       SelectionChanged="ModelSelector_SelectionChanged"
                       Background="#1B2923"
                       Foreground="#102019" />
+            <CheckBox x:Name="ContextAwareCorrectionCheckBox"
+                      Content="Kontextabhängig korrigieren"
+                      Margin="0,8,0,3"
+                      Foreground="#C4D0CB"
+                      Checked="ContextAwareCorrection_Changed"
+                      Unchecked="ContextAwareCorrection_Changed"
+                      ToolTip="Für das lokale LLM: Beschriftungen und Textfragmente nur auf Tippfehler prüfen; Grammatik nur bei klarem Satzkontext. Gilt auch für Bilder." />
             <TextBlock Text="Ausfuehrung"
                        Margin="0,7,0,3"
                        Foreground="#C4D0CB"
