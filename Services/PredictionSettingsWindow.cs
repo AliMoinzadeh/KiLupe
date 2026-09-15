@@ -9,7 +9,7 @@ public sealed class PredictionSettingsWindow : Window
     {
         Title = "Vorhersagemodus";
         Width = 470;
-        Height = 590;
+        Height = 690;
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var panel = new StackPanel { Margin = new Thickness(22) };
@@ -19,6 +19,20 @@ public sealed class PredictionSettingsWindow : Window
         panel.Children.Add(new TextBlock { Text = "Kurze Textvorschläge direkt am Schreibcursor", FontSize = 19, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) });
         panel.Children.Add(enabled);
         panel.Children.Add(insertion);
+        var sentenceOnly = new CheckBox
+        {
+            Content = "Nur offenen Satz vervollständigen", IsChecked = settings.OnlyCurrentSentence,
+            Margin = new Thickness(0, 0, 0, 12),
+            ToolTip = "Ausgeschaltet: KiLupe darf auch nach einem abgeschlossenen Satz weiterschreiben."
+        };
+        var calculations = new CheckBox
+        {
+            Content = "Berechnungen und Zahlenfolgen ergänzen", IsChecked = settings.CompleteCalculations,
+            Margin = new Thickness(0, 0, 0, 14),
+            ToolTip = "Berechnungen wie 2 x 3 = 6 und einfache Zahlenfolgen wie 2, 4, 6, 8 → 10. Folgen werden anhand bekannter Muster ergänzt."
+        };
+        panel.Children.Add(sentenceOnly);
+        panel.Children.Add(calculations);
         panel.Children.Add(new TextBlock { Text = "Schreibpause (Millisekunden, 300–5000)" });
         var delay = new TextBox { Text = settings.PauseMilliseconds.ToString(), Margin = new Thickness(0, 4, 0, 12) };
         panel.Children.Add(delay);
@@ -33,7 +47,7 @@ public sealed class PredictionSettingsWindow : Window
         panel.Children.Add(excluded);
         panel.Children.Add(new TextBlock
         {
-            Text = "Vorschläge werden lokal mit Qwen berechnet. Passwortfelder sind ausgeschlossen. Unterstützt werden beschreibbare Textfelder mit zugänglichem Textcursor; maximal 20.000 Zeichen. Mitten im Text erscheint eine kleine Vorschlagsfläche.",
+            Text = "Textvorschläge entstehen lokal mit Qwen. Berechnungen und einfache Zahlenfolgen werden ohne Sprachmodell ausgewertet. Passwortfelder sind ausgeschlossen. Unterstützt werden beschreibbare Textfelder mit zugänglichem Textcursor; maximal 20.000 Zeichen. Mitten im Text erscheint eine kleine Vorschlagsfläche.",
             TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12)
         });
         var status = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = System.Windows.Media.Brushes.Firebrick };
@@ -51,6 +65,7 @@ public sealed class PredictionSettingsWindow : Window
             var updated = new PredictionSettings
             {
                 Enabled = enabled.IsChecked == true, AllowInsertion = insertion.IsChecked == true,
+                OnlyCurrentSentence = sentenceOnly.IsChecked == true, CompleteCalculations = calculations.IsChecked == true,
                 PauseMilliseconds = milliseconds, AcceptKey = selectedKey,
                 AcceptModifiers = modifiers.SelectedIndex == 0 ? ModifierKeys.Control | ModifierKeys.Alt : ModifierKeys.Control | ModifierKeys.Shift,
                 ExcludedProcesses = excluded.Text

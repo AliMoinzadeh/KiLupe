@@ -79,7 +79,7 @@ public sealed class LocalLlamaTextCorrectionService : ITextCorrectionService
             cancellationToken);
     }
 
-    public Task<string> PredictAsync(string before, string after, CancellationToken cancellationToken)
+    public Task<string> PredictAsync(string before, string after, CancellationToken cancellationToken, bool onlyCurrentSentence = true)
     {
         return Task.Run(async () =>
         {
@@ -90,7 +90,7 @@ public sealed class LocalLlamaTextCorrectionService : ITextCorrectionService
                 var loadedWeights = GetOrLoadWeights();
                 if (loadedWeights is null) throw new InvalidOperationException(StatusText);
                 var prompt = PredictionPrompt.Create(before, after,
-                    text => loadedWeights.Tokenize(text, false, true, Encoding.UTF8).Length);
+                    text => loadedWeights.Tokenize(text, false, true, Encoding.UTF8).Length, onlyCurrentSentence);
                 if (prompt is null) return "";
                 var executor = new StatelessExecutor(loadedWeights, modelParameters) { ApplyTemplate = false };
                 using var sampling = new DefaultSamplingPipeline

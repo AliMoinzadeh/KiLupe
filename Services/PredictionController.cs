@@ -32,7 +32,7 @@ public sealed class PredictionController : IDisposable
         if (value.Enabled)
         {
             modelPath = ModelCatalog.Create().TextCorrectionModels.Single(item => item.Id == TextCorrectionModelKind.LocalLlm).ModelPath;
-            if (modelPath is null) { SetStatus("Vorhersage nicht verfuegbar: lokales Qwen-Modell fehlt."); return false; }
+            if (modelPath is null && !value.CompleteCalculations) { SetStatus("Vorhersage nicht verfuegbar: lokales Qwen-Modell fehlt."); return false; }
             if (value.AllowInsertion)
             {
                 if (hotkey is not null && value.AcceptKey == settings.AcceptKey && value.AcceptModifiers == settings.AcceptModifiers)
@@ -68,8 +68,9 @@ public sealed class PredictionController : IDisposable
             SetStatus("Vorhersage ausgeschaltet.");
             return true;
         }
-        model ??= new LocalLlamaTextCorrectionService(modelPath!);
-        SetStatus("Vorhersage aktiv. Zum Schreiben in ein anderes Programm wechseln.");
+        if (modelPath is not null) model ??= new LocalLlamaTextCorrectionService(modelPath);
+        SetStatus(model is null ? "Berechnungen und Zahlenfolgen aktiv. Fuer Textvorschlaege fehlt das lokale Qwen-Modell."
+            : "Vorhersage aktiv. Zum Schreiben in ein anderes Programm wechseln.");
         timer.Start();
         return true;
     }
@@ -125,7 +126,10 @@ public sealed class PredictionController : IDisposable
         try
         {
             SetStatus("Vorschlag wird lokal berechnet ...");
-            var text = await model!.PredictAsync(snapshot.Before, snapshot.After, cancellation.Token);
+            var predictionModel = model;
+            Func<string, string, bool, CancellationToken, Task<string>>? predict = predictionModel is null ? null
+                : (before, after, onlySentence, token) => predictionModel.PredictAsync(before, after, token, onlySentence);
+            var text = await PredictionGenerator.GenerateAsync(snapshot.Before, snapshot.After, settings, predict, cancellation.Token);
             if (disposed || cancellation.IsCancellationRequested || session.Generation != generation) return;
             var current = await CaptureAsync();
             if (disposed || cancellation.IsCancellationRequested || current != snapshot || session.Generation != generation) return;

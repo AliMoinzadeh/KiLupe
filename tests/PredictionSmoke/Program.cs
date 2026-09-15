@@ -21,6 +21,7 @@ public static class Program
             new Application { ShutdownMode = ShutdownMode.OnMainWindowClose }.Run(window);
             return 0;
         }
+        if (args.Contains("--features")) return PredictionQualityCheck.RunFeatures();
         if (args.Contains("--quality")) return PredictionQualityCheck.Run();
         if (args.Contains("--model"))
         {

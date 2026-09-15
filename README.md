@@ -197,3 +197,25 @@ Lokaler Modell-Smoke-Test: `dotnet run --project tests/PredictionSmoke -- --mode
 Der Desktop-Test benoetigt eine interaktive Sitzung mit erlaubtem Vordergrundfokus und tippt ausschliesslich in sein eigenes Testfenster.
 
 Die Vorhersage setzt jetzt den vorgegebenen Dokumenttext direkt fort, statt eine Chat-Antwort auf den Text zu erzeugen. Angebrochene Woerter werden an einer Wortgrenze erzeugt und gegen den bereits getippten Teil geprueft. Wiederholter Folgetext wird entfernt; bei fehlender passender Ergaenzung bleibt das Overlay leer. Das lokale Modell bleibt unveraendert. Den dokumentierten Vorher-/Nachher-Vergleich und den wiederholbaren Testlauf beschreibt [docs/prediction-quality.md](docs/prediction-quality.md).
+### Satzfortsetzung und Berechnungen einstellen
+
+Unter **Vorhersagemodus ...** stehen zwei weitere Optionen bereit (beide standardmaessig eingeschaltet):
+
+- **Nur offenen Satz vervollstaendigen**: Nach einem erkannten Satzende wird kein weiterer Text angefragt. Ausschalten erlaubt auch den naechsten Satz und kurze Fortsetzungen ueber Satzgrenzen hinweg. Die Erkennung beruecksichtigt gaengige Abkuerzungen und Ordnungszahlen, ist aber keine vollstaendige sprachliche Satzanalyse.
+- **Berechnungen und Zahlenfolgen ergaenzen**: Ein Rechenausdruck auf der aktuellen Zeile vor `=` wird direkt ausgewertet, z. B. `2 x 3 = ` → `6`, `(2 + 3) * 4 = ` → `20` oder `1,5 + 2,25 = ` → `3,75`. Eine Bezeichnung mit Doppelpunkt ist moeglich: `Ergebnis: 2 x 3 = `. Das Ergebnis wird im Overlay angeboten und nur mit der bereits vorhandenen Einfuegeerlaubnis und dem Shortcut uebernommen.
+
+Der Rechner unterstuetzt `+`, `-`, `*`, `x`, `×`, `/`, `÷`, Klammern und vorzeichenbehaftete Dezimalzahlen. Punkt und Komma sind Dezimaltrennzeichen, keine Tausendertrennzeichen. Ergebnisse sind exakt; periodische oder sehr lange Dezimalergebnisse werden als gekuerzter Bruch angezeigt (`1 / 3 = 1/3`). Division durch null, Variablen, Funktionen, Potenzen und unvollstaendige Ausdruecke werden nicht geraten. Ausdruecke sind auf 200 Zeichen, Zahlen auf 30 Ziffern und Verschachtelung auf 16 Ebenen begrenzt. Bereits vorhandene Ergebnisse auf derselben Zeile werden nicht ersetzt.
+
+Berechnungen funktionieren auch ohne geladenes oder installiertes Qwen-Modell. Beide Einstellungen werden gespeichert. Der kombinierte lokale Funktionstest ist `dotnet run --project tests/PredictionSmoke -- --features`.
+### Zahlenfolgen
+
+Die Option **Berechnungen und Zahlenfolgen ergaenzen** bietet auch den naechsten Wert numerischer Listen an. Die Auswertung erfolgt lokal ohne Sprachmodell und nutzt dieselbe exakte Bruchrechnung wie der Rechner:
+
+- Konstanter Abstand, mindestens drei Werte: `2, 4, 6, 8, ` → `10`.
+- Konstanter Faktor, mindestens drei Werte: `1, 2, 4, 8, ` → `16`.
+- Konstante zweite Differenz, mindestens fuenf Werte: `1, 4, 9, 16, 25, ` → `36`.
+- Summe der beiden vorherigen Werte, mindestens sechs Werte: `1, 1, 2, 3, 5, 8, ` → `13`.
+
+Listen koennen Kommas, Semikolons oder Leerzeichen verwenden und optional eine Bezeichnung tragen (`Folge: ...`). Das Trennzeichen wird bei Bedarf mit vorgeschlagen. Negative Zahlen, Dezimalpunkte und Brueche werden exakt verarbeitet; fuer Dezimalkommas bitte Semikolons verwenden (`0,5; 1,0; 1,5; ` → `2`). Die Erkennung prueft alle eingegebenen Werte, maximal 32 Werte und 512 Zeichen der aktuellen Zeile. Bereits vorhandener Folgetext auf derselben Zeile wird nicht ersetzt.
+
+Eine endliche Zahlenfolge bestimmt ihren naechsten Wert nicht eindeutig. Der Vorschlag folgt den oben genannten einfachen Mustern. Bei zu wenigen Werten, unbekannten Mustern oder widerspruechlichen Ergebnissen bleibt der Vorschlag aus; es gibt keinen Rueckfall auf eine Modellvermutung. Die Option schaltet Rechner und Folgen gemeinsam ein oder aus.

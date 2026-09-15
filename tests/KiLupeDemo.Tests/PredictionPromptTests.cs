@@ -5,7 +5,7 @@ namespace KiLupeDemo.Tests;
 public sealed class PredictionPromptTests
 {
     private static PredictionPrompt Build(string before, string after = "")
-        => PredictionPrompt.Create(before, after, text => text.Length / 4)!;
+        => PredictionPrompt.Create(before, after, text => text.Length / 4, onlyCurrentSentence: false)!;
 
     [Fact]
     public void ContinuesFromLastWordWithoutStandaloneTrailingSpace()

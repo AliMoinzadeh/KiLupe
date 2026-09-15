@@ -19,6 +19,26 @@ public static class PredictionQualityCheck
         ("causal", "Das ist kein Problem, weil ", "")
     };
 
+    public static int RunFeatures()
+    {
+        var path = ModelCatalog.Create().TextCorrectionModels.Single(item => item.Id == TextCorrectionModelKind.LocalLlm).ModelPath!;
+        using var model = new LocalLlamaTextCorrectionService(path);
+        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        var calls = 0;
+        Task<string> Predict(string before, string after, bool onlySentence, CancellationToken token)
+        {
+            calls++;
+            return model.PredictAsync(before, after, token, onlySentence);
+        }
+        var math = PredictionGenerator.GenerateAsync("2 x 3 = ", "", new PredictionSettings(), Predict, cancel.Token).GetAwaiter().GetResult();
+        var sequence = PredictionGenerator.GenerateAsync("2, 4, 6, 8, ", "", new PredictionSettings(), Predict, cancel.Token).GetAwaiter().GetResult();
+        var strict = PredictionGenerator.GenerateAsync("Das Projekt ist abgeschlossen. ", "", new PredictionSettings(), Predict, cancel.Token).GetAwaiter().GetResult();
+        if (math != "6" || sequence != "10" || strict != "" || calls != 0) return 1;
+        var free = PredictionGenerator.GenerateAsync("Das Projekt ist abgeschlossen. ", "",
+            new PredictionSettings { OnlyCurrentSentence = false }, Predict, cancel.Token).GetAwaiter().GetResult();
+        Console.WriteLine("FEATURES " + JsonSerializer.Serialize(new { Math = math, Sequence = sequence, Strict = strict, Free = free, ModelCalls = calls }));
+        return string.IsNullOrWhiteSpace(free) || calls != 1 ? 1 : 0;
+    }
     public static int Run()
     {
         var path = ModelCatalog.Create().TextCorrectionModels.Single(item => item.Id == TextCorrectionModelKind.LocalLlm).ModelPath!;

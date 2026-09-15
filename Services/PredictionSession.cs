@@ -85,6 +85,8 @@ public static class PredictionText
 
     private static string NormalizeInsertion(string response, string after)
     {
+        after = after.Split('\r', '\n')[0];
+        if (string.IsNullOrWhiteSpace(after)) return Normalize(response);
         var normalized = Normalize(response, preserveTrailingSpace: after.Length > 0);
         if (after.Length == 0) return normalized;
         var following = after.TrimStart();

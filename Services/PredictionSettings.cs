@@ -7,6 +7,8 @@ namespace KiLupeDemo.Services;
 public sealed record PredictionSettings
 {
     public bool Enabled { get; init; }
+    public bool OnlyCurrentSentence { get; init; } = true;
+    public bool CompleteCalculations { get; init; } = true;
     public bool AllowInsertion { get; init; }
     public int PauseMilliseconds { get; init; } = 700;
     public Key AcceptKey { get; init; } = Key.Space;
